@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>吉伊卡哇猜猜樂 ✨</title>
+    <title>猜猜我是誰</title>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <style>
@@ -106,12 +106,20 @@
             }, 1000);
         }
 
-        window.submitAns = () => {
-            const ans = document.getElementById('ans-input').value;
-            update(ref(db, 'users/' + myName), { lastAns: ans, time: Date.now() });
-            document.getElementById('answer-zone').innerText = "已送出！等待開獎 ✨";
-        };
-
+    window.submitAns = () => {
+    const ans = document.getElementById('ans-input').value;
+    const now = Date.now();
+    // 獲取當前題目的開始時間來計算作答耗時
+    onValue(ref(db, 'gameState/startTime'), (snap) => {
+        const startTime = snap.val();
+        update(ref(db, `users/${myName}`), { 
+            lastAns: ans,
+            lastTime: now - startTime // 紀錄花了幾毫秒作答
+        });
+    }, {onlyOnce: true});
+    
+    document.getElementById('answer-zone').innerText = "已送出答案 ✨";
+};
         function showRanking() {
             document.getElementById('game-zone').style.display = 'none';
             document.getElementById('rank-zone').style.display = 'block';

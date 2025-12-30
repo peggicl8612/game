@@ -2,22 +2,35 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>吉伊卡哇控制台 👑</title>
+    <title>控制面板</title>
     <style>
-        body { background: #E0F7FA; font-family: sans-serif; text-align: center; padding: 20px; }
-        .admin-box { background: white; border: 4px solid #5A5A5A; border-radius: 20px; padding: 20px; max-width: 500px; margin: auto; }
-        input { width: 80%; padding: 10px; margin: 10px; border: 2px solid #5A5A5A; border-radius: 10px; }
-        .btn { background: #FFD1DC; padding: 10px 20px; border-radius: 10px; cursor: pointer; font-weight: bold; border: 2px solid #5A5A5A; }
+        :root { --p: #FFD1DC; --b: #E0F7FA; --y: #FFF9E5; --t: #5A5A5A; }
+        body { background: var(--b); font-family: sans-serif; text-align: center; padding: 20px; color: var(--t); }
+        .admin-box { background: white; border: 4px solid var(--t); border-radius: 20px; padding: 20px; max-width: 600px; margin: auto; box-shadow: 8px 8px 0 var(--p); }
+        .q-item { border: 2px dashed var(--p); padding: 15px; margin: 10px 0; border-radius: 15px; text-align: left; position: relative; }
+        input { width: 90%; padding: 8px; margin: 5px 0; border: 2px solid var(--t); border-radius: 8px; }
+        .btn { padding: 10px 20px; border-radius: 10px; cursor: pointer; font-weight: bold; border: 2px solid var(--t); margin: 5px; }
+        .btn-add { background: #B2DFDB; }
+        .btn-start { background: var(--p); font-size: 1.2rem; width: 100%; margin-top: 20px; }
+        .status-tag { display: inline-block; padding: 5px 15px; background: var(--y); border-radius: 20px; border: 2px solid var(--t); margin-bottom: 10px; }
     </style>
 </head>
 <body>
     <div class="admin-box">
-        <h2>👑 主持人控制面板</h2>
-        <input type="text" id="img-url" placeholder="圖片 URL">
-        <input type="text" id="ans" placeholder="正確答案 (多個用逗號隔開)">
-        <br>
-        <button class="btn" onclick="sendQ()">🚀 發布題目 (15秒倒數)</button>
-        <button class="btn" style="background: #E0F7FA;" onclick="endRound()">🏁 結束這一題並排名</button>
+        <h2>題目設定面版</h2>
+        <div class="status-tag" id="game-status">狀態：編輯中</div>
+        
+        <div id="questions-list">
+            <div class="q-item">
+                <strong>第 1 題</strong>
+                <input type="text" class="q-img" placeholder="圖片連結 (JPG/PNG)">
+                <input type="text" class="q-ans" placeholder="正確答案 (多個用逗號隔開)">
+            </div>
+        </div>
+
+        <button class="btn btn-add" onclick="addQuestion()">➕ 新增下一題</button>
+        <hr>
+        <button class="btn btn-start" onclick="startAutoGame()">啟動自動遊戲 (每題15秒)</button>
     </div>
 
     <script type="module">
@@ -25,103 +38,116 @@
         import { getDatabase, ref, set, update, onValue } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-database.js";
 
         const firebaseConfig = {
-    apiKey: "AIzaSyBEkuEJ19FQ-0y-KiJeInCUZ7BTv6TuXOE",
-    authDomain: "game-3dc74.firebaseapp.com",
-     databaseURL: "https://game-3dc74-default-rtdb.asia-southeast1.firebasedatabase.app", 
-    projectId: "game-3dc74",
-    storageBucket: "game-3dc74.firebasestorage.app",
-    messagingSenderId: "239384658458",
-    appId: "1:239384658458:web:3986833e5d61fc932a87a3",
-    measurementId: "G-Q0J38297L3"
-};
+            apiKey: "AIzaSyBEkuEJ19FQ-0y-KiJeInCUZ7BTv6TuXOE",
+            authDomain: "game-3dc74.firebaseapp.com",
+            databaseURL: "https://game-3dc74-default-rtdb.asia-southeast1.firebasedatabase.app", 
+            projectId: "game-3dc74",
+            storageBucket: "game-3dc74.firebasestorage.app",
+            messagingSenderId: "239384658458",
+            appId: "1:239384658458:web:3986833e5d61fc932a87a3",
+            measurementId: "G-Q0J38297L3"
+        };
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
 
-     window.sendQ = () => {
-    const imgElement = document.getElementById('img-url');
-    const ansElement = document.getElementById('ans');
-    
-    // 檢查元素是否存在，避免抓不到值報錯
-    if (!imgElement || !ansElement) return;
+        let qCount = 1;
 
-    const img = imgElement.value;
-    const ans = ansElement.value.split(',');
-
-    if (!img || !ansElement.value) {
-        alert("請輸入圖片網址與答案！");
-        return;
-    }
-
-    // 執行寫入
-    set(ref(db, 'gameState'), {
-        status: "playing",
-        imgUrl: img,
-        answers: ans,
-        startTime: Date.now()
-    }).then(() => {
-        alert("題目已成功發佈！倒數開始！");
-    }).catch((error) => {
-        console.error("發佈失敗：", error);
-        alert("發佈失敗，請檢查主控台錯誤訊息。");
-    });
-};
-     window.endRound = () => {
-            // 抓取 gameState 的答案進行比分
-            onValue(ref(db, 'game'), (snap) => {
-                const state = snap.val();
-                const correctOnes = state.answers;
-                onValue(ref(db, 'users'), (uSnap) => {
-                    const users = uSnap.val();
-                    for(let name in users) {
-                        if(correctOnes.includes(users[name].lastAns)) {
-                            // 計算速度加分
-                            const bonus = Math.max(0, 15 - Math.floor((users[name].time - state.startTime)/1000));
-                            update(ref(db, 'users/' + name), { 
-                                score: users[name].score + 100 + (bonus * 10),
-                                lastAns: "" 
-                            });
-                        }
-                    }
-                }, { onlyOnce: true });
-            }, { onlyOnce: true });
-            set(ref(db, 'gameState/status'), "ranking");
+        // 1. 新增題目框
+        window.addQuestion = () => {
+            qCount++;
+            const container = document.getElementById('questions-list');
+            const div = document.createElement('div');
+            div.className = 'q-item';
+            div.innerHTML = `
+                <strong>第 ${qCount} 題</strong>
+                <input type="text" class="q-img" placeholder="圖片連結 (JPG/PNG)">
+                <input type="text" class="q-ans" placeholder="正確答案 (多個用逗號隔開)">
+            `;
+            container.appendChild(div);
         };
 
-        // 在原本的 master.html 腳本中替換或新增此函數
-window.startAutoGame = () => {
-    const totalQuestions = questions.length;
-    let qIndex = 0;
+        // 2. 核心：啟動自動遊戲邏輯
+        window.startAutoGame = async () => {
+            const imgs = document.querySelectorAll('.q-img');
+            const ans = document.querySelectorAll('.q-ans');
+            const questions = [];
 
-    // 定義每一輪的總時長 (15秒答題 + 5秒看排名 = 20秒)
-    const ROUND_DURATION = 20000; 
-
-    const startSession = Date.now();
-
-    function triggerNext() {
-        if (qIndex < totalQuestions) {
-            set(ref(db, 'gameState'), {
-                index: qIndex,
-                status: "playing",
-                startTime: Date.now(),
-                mode: "auto"
+            // 整理題庫
+            imgs.forEach((el, i) => {
+                if(el.value) {
+                    questions.push({
+                        img: el.value,
+                        ans: ans[i].value.split(',').map(s => s.trim())
+                    });
+                }
             });
 
-            // 15秒後自動轉為排名模式
-            setTimeout(() => {
-                set(ref(db, 'gameState/status'), "round_rank");
-            }, 15000);
+            if(questions.length === 0) return alert("請至少輸入一題！");
 
-            qIndex++;
-            // 20秒後自動進入下一題
-            setTimeout(triggerNext, ROUND_DURATION);
-        } else {
-            // 全部結束，顯示頒獎台
-            set(ref(db, 'gameState/status'), "final_ceremony");
+            // 先把題庫存入資料庫供玩家端抓取
+            await set(ref(db, 'gameData/questions'), questions);
+            
+            // 重置所有玩家分數
+            onValue(ref(db, 'users'), (snap) => {
+                const users = snap.val();
+                for(let name in users) {
+                    update(ref(db, `users/${name}`), { score: 0, lastAns: "", lastTime: 0 });
+                }
+            }, {onlyOnce: true});
+
+            // 開始循環
+            let currentIdx = 0;
+            const ROUND_TIME = 15000; // 15秒答題
+            const RANK_TIME = 5000;   // 5秒看排名
+
+            const runRound = () => {
+                if(currentIdx < questions.length) {
+                    document.getElementById('game-status').innerText = `狀態：進行第 ${currentIdx+1} 題`;
+                    
+                    // A. 發布題目
+                    set(ref(db, 'gameState'), {
+                        index: currentIdx,
+                        status: "playing",
+                        startTime: Date.now()
+                    });
+
+                    // B. 15秒後結算並轉排名模式
+                    setTimeout(() => {
+                        calculateThisRound(questions[currentIdx].ans);
+                        set(ref(db, 'gameState/status'), "round_rank");
+                        
+                        currentIdx++;
+                        // C. 再過 5 秒後進入下一題
+                        setTimeout(runRound, RANK_TIME);
+                    }, ROUND_TIME);
+
+                } else {
+                    // D. 全部結束，顯示頒獎台
+                    document.getElementById('game-status').innerText = `狀態：遊戲結束！`;
+                    set(ref(db, 'gameState/status'), "final_ceremony");
+                }
+            };
+
+            runRound();
+        };
+
+        // 結算分數邏輯
+        function calculateThisRound(correctAnswers) {
+            onValue(ref(db, 'users'), (snap) => {
+                const users = snap.val();
+                for(let name in users) {
+                    if(correctAnswers.includes(users[name].lastAns)) {
+                        // 越快答對分數越高 (最高150, 最低100)
+                        const bonus = Math.max(0, 15 - Math.floor((users[name].lastTime || 0) / 1000));
+                        const addedScore = 100 + (bonus * 3); 
+                        update(ref(db, `users/${name}`), { 
+                            score: (users[name].score || 0) + addedScore,
+                            lastAns: "" // 清空當前答案
+                        });
+                    }
+                }
+            }, {onlyOnce: true});
         }
-    }
-
-    triggerNext();
-};
     </script>
 </body>
 </html>

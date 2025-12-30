@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <title>吉伊卡哇控制台 👑</title>
+    <style>
+        body { background: #E0F7FA; font-family: sans-serif; text-align: center; padding: 20px; }
+        .admin-box { background: white; border: 4px solid #5A5A5A; border-radius: 20px; padding: 20px; max-width: 500px; margin: auto; }
+        input { width: 80%; padding: 10px; margin: 10px; border: 2px solid #5A5A5A; border-radius: 10px; }
+        .btn { background: #FFD1DC; padding: 10px 20px; border-radius: 10px; cursor: pointer; font-weight: bold; border: 2px solid #5A5A5A; }
+    </style>
+</head>
+<body>
+    <div class="admin-box">
+        <h2>👑 主持人控制面板</h2>
+        <input type="text" id="img-url" placeholder="圖片 URL">
+        <input type="text" id="ans" placeholder="正確答案 (多個用逗號隔開)">
+        <br>
+        <button class="btn" onclick="sendQ()">🚀 發布題目 (15秒倒數)</button>
+        <button class="btn" style="background: #E0F7FA;" onclick="endRound()">🏁 結束這一題並排名</button>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
+        import { getDatabase, ref, set, update, onValue } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBEkuEJ19FQ-0y-KiJeINcUZ7BTv6TuXOE",
+            authDomain: "game-3dc74.firebaseapp.com",
+            projectId: "game-3dc74",
+            storageBucket: "game-3dc74.firebasestorage.app",
+            messagingSenderId: "239384658458",
+            appId: "1:239384658458:web:3986833e5d61fc932a87a3",
+            measurementId: "G-Q0J38297L3"
+        };
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        window.sendQ = () => {
+            const img = document.getElementById('img-url').value;
+            const ans = document.getElementById('ans').value.split(',');
+            set(ref(db, 'gameState'), {
+                status: "playing",
+                imgUrl: img,
+                answers: ans,
+                startTime: Date.now()
+            });
+        };
+
+        window.endRound = () => {
+            // 抓取 gameState 的答案進行比分
+            onValue(ref(db, 'gameState'), (snap) => {
+                const state = snap.val();
+                const correctOnes = state.answers;
+                onValue(ref(db, 'users'), (uSnap) => {
+                    const users = uSnap.val();
+                    for(let name in users) {
+                        if(correctOnes.includes(users[name].lastAns)) {
+                            // 計算速度加分
+                            const bonus = Math.max(0, 15 - Math.floor((users[name].time - state.startTime)/1000));
+                            update(ref(db, 'users/' + name), { 
+                                score: users[name].score + 100 + (bonus * 10),
+                                lastAns: "" 
+                            });
+                        }
+                    }
+                }, { onlyOnce: true });
+            }, { onlyOnce: true });
+            set(ref(db, 'gameState/status'), "ranking");
+        };
+    </script>
+</body>
+</html>

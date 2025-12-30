@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>吉伊卡哇猜猜樂 ✨</title>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        :root { --p: #FFD1DC; --y: #FFF9E5; --b: #E0F7FA; --t: #5A5A5A; --w: #FFFFFF; }
+        body { background: var(--y); font-family: "Helvetica Neue", Helvetica, Arial, "PingFang TC", "Microsoft JhengHei", sans-serif; color: var(--t); margin: 0; padding: 20px; display: flex; justify-content: center; }
+        .card { background: var(--w); border: 4px solid var(--t); border-radius: 30px; padding: 25px; width: 100%; max-width: 400px; box-shadow: 10px 10px 0 var(--p); position: relative; }
+        h2 { color: #FF8E9E; text-shadow: 2px 2px 0px #fff; }
+        input { width: 80%; padding: 12px; border: 3px solid var(--t); border-radius: 15px; margin: 10px 0; font-size: 16px; outline: none; }
+        .btn { background: var(--b); border: 3px solid var(--t); padding: 12px 25px; border-radius: 50px; cursor: pointer; font-weight: bold; font-size: 18px; transition: 0.2s; }
+        .btn:active { transform: translateY(4px); }
+        .img-box { width: 100%; border: 3px solid var(--t); border-radius: 20px; margin-top: 15px; display: none; }
+        .progress-container { width: 100%; height: 20px; background: #eee; border-radius: 10px; border: 3px solid var(--t); margin: 20px 0; overflow: hidden; display: none; }
+        .progress-bar { width: 100%; height: 100%; background: var(--p); transition: width 1s linear; }
+        .rank-item { display: flex; justify-content: space-between; padding: 10px; border-bottom: 2px dashed var(--p); font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div id="login-zone">
+            <h2>🎀 歡迎來到遊戲間</h2>
+            <p>請輸入你的小名：</p>
+            <input type="text" id="nickname" placeholder="例如：兔兔粉">
+            <br><br>
+            <button class="btn" onclick="joinGame()">準備好了！</button>
+            <div id="qrcode" style="margin-top: 30px; display: flex; justify-content: center;"></div>
+        </div>
+
+        <div id="game-zone" style="display:none;">
+            <h3 id="msg">等候出題者發號施令... 🍵</h3>
+            <img id="q-img" class="img-box">
+            <div class="progress-container" id="timer-box"><div class="progress-bar" id="bar"></div></div>
+            <div id="answer-zone" style="display:none;">
+                <input type="text" id="ans-input" placeholder="答案是什麼呢？">
+                <br>
+                <button class="btn" onclick="submitAns()">送出答案！</button>
+            </div>
+        </div>
+
+        <div id="rank-zone" style="display:none;">
+            <h2 id="rank-title">🏆 排名表</h2>
+            <div id="rank-list"></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
+        import { getDatabase, ref, set, onValue, update } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-database.js";
+
+        const firebaseConfig = {
+  apiKey: "AIzaSyBEkuEJ19FQ-0y-KiJeINcUZ7BTv6TuXOE",
+  authDomain: "game-3dc74.firebaseapp.com",
+  projectId: "game-3dc74",
+  storageBucket: "game-3dc74.firebasestorage.app",
+  messagingSenderId: "239384658458",
+  appId: "1:239384658458:web:3986833e5d61fc932a87a3",
+  measurementId: "G-Q0J38297L3"
+};
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        let myName = "";
+
+        new QRCode(document.getElementById("qrcode"), { text: window.location.href, width: 120, height: 120 });
+
+        window.joinGame = () => {
+            myName = document.getElementById('nickname').value;
+            if(!myName) return alert("要填名字才能玩喔！");
+            document.getElementById('login-zone').style.display = 'none';
+            document.getElementById('game-zone').style.display = 'block';
+            set(ref(db, 'users/' + myName), { score: 0, lastAns: "", time: 0 });
+            listenToGame();
+        };
+
+        function listenToGame() {
+            onValue(ref(db, 'gameState'), (snapshot) => {
+                const state = snapshot.val();
+                if(!state) return;
+                if(state.status === "playing") {
+                    document.getElementById('msg').innerText = "快猜猜這是誰？";
+                    document.getElementById('q-img').src = state.imgUrl;
+                    document.getElementById('q-img').style.display = 'block';
+                    document.getElementById('timer-box').style.display = 'block';
+                    document.getElementById('answer-zone').style.display = 'block';
+                    document.getElementById('rank-zone').style.display = 'none';
+                    startTimer(state.startTime);
+                } else if(state.status === "ranking") {
+                    showRanking();
+                }
+            });
+        }
+
+        function startTimer(startTime) {
+            const bar = document.getElementById('bar');
+            const itv = setInterval(() => {
+                const diff = 15 - Math.floor((Date.now() - startTime)/1000);
+                bar.style.width = Math.max(0, (diff/15*100)) + "%";
+                if(diff <= 0) {
+                    clearInterval(itv);
+                    document.getElementById('answer-zone').style.display = 'none';
+                }
+            }, 1000);
+        }
+
+        window.submitAns = () => {
+            const ans = document.getElementById('ans-input').value;
+            update(ref(db, 'users/' + myName), { lastAns: ans, time: Date.now() });
+            document.getElementById('answer-zone').innerText = "已送出！等待開獎 ✨";
+        };
+
+        function showRanking() {
+            document.getElementById('game-zone').style.display = 'none';
+            document.getElementById('rank-zone').style.display = 'block';
+            onValue(ref(db, 'users'), (snap) => {
+                const users = snap.val();
+                const sorted = Object.entries(users).sort((a,b) => b[1].score - a[1].score);
+                let html = "";
+                sorted.forEach(([name, data], index) => {
+                    html += `<div class="rank-item"><span>${index+1}. ${name}</span><span>${data.score}分</span></div>`;
+                });
+                document.getElementById('rank-list').innerHTML = html;
+            }, { onlyOnce: true });
+        }
+    </script>
+</body>
+</html>

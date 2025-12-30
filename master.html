@@ -65,7 +65,7 @@
         alert("發佈失敗，請檢查主控台錯誤訊息。");
     });
 };
-        window.endRound = () => {
+     window.endRound = () => {
             // 抓取 gameState 的答案進行比分
             onValue(ref(db, 'game'), (snap) => {
                 const state = snap.val();
@@ -86,6 +86,42 @@
             }, { onlyOnce: true });
             set(ref(db, 'gameState/status'), "ranking");
         };
+
+        // 在原本的 master.html 腳本中替換或新增此函數
+window.startAutoGame = () => {
+    const totalQuestions = questions.length;
+    let qIndex = 0;
+
+    // 定義每一輪的總時長 (15秒答題 + 5秒看排名 = 20秒)
+    const ROUND_DURATION = 20000; 
+
+    const startSession = Date.now();
+
+    function triggerNext() {
+        if (qIndex < totalQuestions) {
+            set(ref(db, 'gameState'), {
+                index: qIndex,
+                status: "playing",
+                startTime: Date.now(),
+                mode: "auto"
+            });
+
+            // 15秒後自動轉為排名模式
+            setTimeout(() => {
+                set(ref(db, 'gameState/status'), "round_rank");
+            }, 15000);
+
+            qIndex++;
+            // 20秒後自動進入下一題
+            setTimeout(triggerNext, ROUND_DURATION);
+        } else {
+            // 全部結束，顯示頒獎台
+            set(ref(db, 'gameState/status'), "final_ceremony");
+        }
+    }
+
+    triggerNext();
+};
     </script>
 </body>
 </html>

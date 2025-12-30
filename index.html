@@ -77,24 +77,23 @@
             listenToGame();
         };
 
-        function listenToGame() {
-            onValue(ref(db, 'gameState'), (snapshot) => {
-                const state = snapshot.val();
-                if(!state) return;
-                if(state.status === "playing") {
-                    document.getElementById('msg').innerText = "快猜猜這是誰？";
-                    document.getElementById('q-img').src = state.imgUrl;
-                    document.getElementById('q-img').style.display = 'block';
-                    document.getElementById('timer-box').style.display = 'block';
-                    document.getElementById('answer-zone').style.display = 'block';
-                    document.getElementById('rank-zone').style.display = 'none';
-                    startTimer(state.startTime);
-                } else if(state.status === "ranking") {
-                    showRanking();
-                }
-            });
-        }
+        // 修改原本的 listenGame 函數
+    function listenGame() {
+    onValue(ref(db, 'gameState'), snap => {
+        const state = snap.val();
+        if(!state) return;
 
+        if(state.status === "playing") {
+            startRound(state);
+        } else if(state.status === "round_rank") {
+            // 自動模式下，顯示本題排名並準備迎接下一題
+            showRank("round-rank-zone", "round-list");
+            document.getElementById('game-zone').style.display = 'none';
+        } else if(state.status === "final_ceremony") {
+            showFinalCeremony();
+        }
+    });
+}
         function startTimer(startTime) {
             const bar = document.getElementById('bar');
             const itv = setInterval(() => {

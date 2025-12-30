@@ -3,28 +3,52 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>猜猜樂✨</title>
+    <title>吉伊卡哇猜猜樂 ✨</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
     <style>
         :root { --p: #FFD1DC; --y: #FFF9E5; --b: #E0F7FA; --t: #5A5A5A; }
-        body { background: var(--y); font-family: sans-serif; color: var(--t); text-align: center; margin: 0; padding: 15px; }
+        body { background: var(--y); font-family: "Microsoft JhengHei", sans-serif; color: var(--t); text-align: center; margin: 0; padding: 15px; }
         .card { background: white; border: 4px solid var(--t); border-radius: 25px; padding: 20px; max-width: 400px; margin: auto; box-shadow: 8px 8px 0 var(--p); }
-        .q-img { width: 100%; border-radius: 15px; border: 3px solid var(--t); margin: 15px 0; display: none; }
-        input { width: 80%; padding: 12px; border-radius: 15px; border: 2px solid var(--t); margin-bottom: 10px; font-size: 16px; }
-        .btn { background: var(--p); border: 3px solid var(--t); padding: 12px 25px; border-radius: 50px; cursor: pointer; font-weight: bold; width: 100%; }
+        .q-img { width: 100%; border-radius: 15px; border: 3px solid var(--t); margin: 15px 0; display: block; }
+        input { width: 85%; padding: 12px; border-radius: 15px; border: 2px solid var(--t); margin-bottom: 10px; font-size: 16px; outline: none; }
+        .btn { background: var(--p); border: 3px solid var(--t); padding: 12px 25px; border-radius: 50px; cursor: pointer; font-weight: bold; width: 100%; transition: 0.2s; }
+        .btn:active { transform: translateY(3px); }
         .timer { font-size: 2rem; font-weight: bold; color: #FF8E9E; }
-        /* 頒獎台樣式 */
+        #qrcode img { margin: auto; border: 5px solid white; border-radius: 10px; }
         .podium { display: flex; justify-content: space-around; align-items: flex-end; height: 160px; margin: 20px 0; }
         .place { background: var(--p); border: 3px solid var(--t); width: 80px; border-radius: 10px 10px 0 0; padding: 10px 5px; font-weight: bold; }
         .p-1 { height: 110px; background: #FFD700; } .p-2 { height: 80px; background: #C0C0C0; } .p-3 { height: 60px; background: #CD7F32; }
+
+        /* 載入動畫 */
+        .loading-animation { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 150px; }
+        .loading-animation img { width: 80px; height: 80px; animation: bounce 1s infinite alternate; }
+        .loading-animation p { margin-top: 15px; font-weight: bold; color: #777; }
+        @keyframes bounce {
+            from { transform: translateY(0); }
+            to { transform: translateY(-15px); }
+        }
+
+        .loading-img {
+            object-fit: contain;
+        }
     </style>
 </head>
 <body>
     <div class="card">
         <div id="login-zone">
-            <h2>歡迎加入遊戲</h2>
+            <h2>🎀 邀請朋友加入</h2>
+            <div id="qrcode" style="margin-bottom: 15px;"></div>
+            <p style="font-size: 0.9rem; color: #888;">掃描上方 QR Code 加入遊戲</p>
             <input type="text" id="nickname" placeholder="輸入你的暱稱...">
-            <button class="btn" id="join-btn">準備好了！</button>
+            <button class="btn" id="join-btn">加入並等待開始</button>
+        </div>
+
+        <div id="waiting-zone" style="display:none;">
+            <div class="loading-animation">
+                <img class="loading-img" src="https://www.jins.com/tw/upload/2025/12/25/compress-694c9d6d1cf0b.jpg" alt="Chiikawa Loading">  
+                <p>等待主持人開始遊戲中... ✨</p>
+            </div>
         </div>
 
         <div id="game-zone" style="display:none;">
@@ -38,7 +62,7 @@
         </div>
 
         <div id="rank-zone" style="display:none;">
-            <h3>✨ 目前總積分排名</h3>
+            <h3>✨ 目前積分排名</h3>
             <div id="rank-list"></div>
         </div>
 
@@ -52,7 +76,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
-        import { getDatabase, ref, set, update, onValue } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-database.js";
+        import { getDatabase, ref, set, update, onValue, remove } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-database.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyBEkuEJ19FQ-0y-KiJeInCUZ7BTv6TuXOE",
@@ -66,25 +90,40 @@
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
 
+        // 初始化 QR Code
+        window.onload = () => {
+            if (typeof QRCode !== "undefined") {
+                new QRCode(document.getElementById("qrcode"), {
+                    text: window.location.href,
+                    width: 140,
+                    height: 140
+                });
+            }
+        };
+
         let myName = "";
         let questions = [];
 
-        // 綁定按鈕事件 (解決 ReferenceError)
         document.getElementById('join-btn').onclick = () => {
             myName = document.getElementById('nickname').value;
             if(!myName) return alert("請輸入暱稱！");
+            
+            // 寫入玩家到資料庫
             set(ref(db, `users/${myName}`), { score: 0, lastAns: "", lastTime: 0 });
+            
+            // 隱藏登入區，顯示等待區
             document.getElementById('login-zone').style.display = 'none';
+            document.getElementById('waiting-zone').style.display = 'block';
+            
             listenToGame();
         };
 
         document.getElementById('submit-btn').onclick = () => {
             const ans = document.getElementById('ans-input').value;
-            const now = Date.now();
             onValue(ref(db, 'gameState/startTime'), (snap) => {
                 update(ref(db, `users/${myName}`), { 
                     lastAns: ans, 
-                    lastTime: now - snap.val() 
+                    lastTime: Date.now() - snap.val() 
                 });
             }, {onlyOnce: true});
             document.getElementById('answer-box').style.display = 'none';
@@ -96,28 +135,52 @@
 
             onValue(ref(db, 'gameState'), snap => {
                 const state = snap.val();
-                if(!state) return;
+                
+                // 【核心修正】如果沒有狀態，就強制停留在等待畫面
+                if (!state || !state.status || state.status === "null") { // 增加 null 判斷
+                    hideAllGameZones();
+                    document.getElementById('waiting-zone').style.display = 'block';
+                    return;
+                }
+
+                // 隱藏等待區 (一旦收到有效狀態就隱藏)
+                document.getElementById('waiting-zone').style.display = 'none';
 
                 if(state.status === "playing") {
                     showQuestion(state);
                 } else if(state.status === "round_rank") {
                     showRanking("rank-zone", "rank-list");
                 } else if(state.status === "final_ceremony") {
-                    showFinalCeremony();
+                    showFinalCeremony(); 
                 }
             });
         }
 
-        function showQuestion(state) {
-            document.getElementById('game-zone').style.display = 'block';
+        function hideAllGameZones() {
+            document.getElementById('login-zone').style.display = 'none';
+            document.getElementById('waiting-zone').style.display = 'none';
+            document.getElementById('game-zone').style.display = 'none';
             document.getElementById('rank-zone').style.display = 'none';
+            document.getElementById('ceremony-zone').style.display = 'none';
+        }
+
+        function showQuestion(state) {
+            hideAllGameZones();
+            document.getElementById('game-zone').style.display = 'block';
+            
             document.getElementById('answer-box').style.display = 'block';
             document.getElementById('wait-msg').style.display = 'none';
             document.getElementById('ans-input').value = "";
             
             const qImg = document.getElementById('q-img');
-            qImg.src = questions[state.index].img;
-            qImg.style.display = 'block';
+            if (questions && questions[state.index]) {
+                qImg.src = questions[state.index].img;
+                qImg.style.display = 'block';
+            } else {
+                // 如果題目還沒載入，顯示載入提示
+                qImg.style.display = 'none';
+                document.getElementById('game-zone').innerHTML += "<p>載入題目中...</p>";
+            }
 
             let timerItv = setInterval(() => {
                 const remain = 15 - Math.floor((Date.now() - state.startTime) / 1000);
@@ -127,10 +190,12 @@
         }
 
         function showRanking(zoneId, listId) {
-            document.getElementById('game-zone').style.display = 'none';
+            hideAllGameZones();
             document.getElementById(zoneId).style.display = 'block';
             onValue(ref(db, 'users'), snap => {
-                const users = Object.entries(snap.val() || {}).sort((a,b) => b[1].score - a[1].score);
+                const data = snap.val();
+                if(!data) return;
+                const users = Object.entries(data).sort((a,b) => b[1].score - a[1].score);
                 document.getElementById(listId).innerHTML = users.map((u, i) => 
                     `<div style="display:flex; justify-content:space-between; padding:10px; border-bottom:1px dashed #ccc;">
                         <span>${i+1}. ${u[0]}</span><span>${u[1].score} 分</span>
@@ -140,18 +205,28 @@
         }
 
         function showFinalCeremony() {
-            document.getElementById('rank-zone').style.display = 'none';
+            hideAllGameZones();
             document.getElementById('ceremony-zone').style.display = 'block';
+            
             confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
 
             onValue(ref(db, 'users'), snap => {
-                const users = Object.entries(snap.val() || {}).sort((a,b) => b[1].score - a[1].score);
-                document.getElementById('podium-content').innerHTML = `
+                const data = snap.val();
+                if(!data) return;
+                const users = Object.entries(data).sort((a,b) => b[1].score - a[1].score);
+                
+                const podium = document.getElementById('podium-content');
+                podium.innerHTML = `
                     <div class="place p-2">🥈<br>${users[1]?.[0] || '-'}</div>
                     <div class="place p-1">🥇<br>${users[0]?.[0] || '-'}</div>
                     <div class="place p-3">🥉<br>${users[2]?.[0] || '-'}</div>
                 `;
-                showRanking("ceremony-zone", "final-list");
+
+                document.getElementById('final-list').innerHTML = users.map((u, i) => 
+                    `<div style="display:flex; justify-content:space-between; padding:10px; border-bottom:1px dashed #ccc;">
+                        <span>${i+1}. ${u[0]}</span><span>${u[1].score} 分</span>
+                    </div>`
+                ).join('');
             }, {onlyOnce: true});
         }
     </script>

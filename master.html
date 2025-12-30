@@ -37,17 +37,34 @@
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
 
-        window.sendQ = () => {
-            const img = document.getElementById('img-url').value;
-            const ans = document.getElementById('ans').value.split(',');
-            set(ref(db, 'game'), {
-                status: "playing",
-                imgUrl: img,
-                answers: ans,
-                startTime: Date.now()
-            });
-        };
+     window.sendQ = () => {
+    const imgElement = document.getElementById('img-url');
+    const ansElement = document.getElementById('ans');
+    
+    // 檢查元素是否存在，避免抓不到值報錯
+    if (!imgElement || !ansElement) return;
 
+    const img = imgElement.value;
+    const ans = ansElement.value.split(',');
+
+    if (!img || !ansElement.value) {
+        alert("請輸入圖片網址與答案！");
+        return;
+    }
+
+    // 執行寫入
+    set(ref(db, 'gameState'), {
+        status: "playing",
+        imgUrl: img,
+        answers: ans,
+        startTime: Date.now()
+    }).then(() => {
+        alert("題目已成功發佈！倒數開始！");
+    }).catch((error) => {
+        console.error("發佈失敗：", error);
+        alert("發佈失敗，請檢查主控台錯誤訊息。");
+    });
+};
         window.endRound = () => {
             // 抓取 gameState 的答案進行比分
             onValue(ref(db, 'game'), (snap) => {

@@ -53,13 +53,14 @@
         import { getDatabase, ref, set, onValue, update } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-database.js";
 
         const firebaseConfig = {
-  apiKey: "AIzaSyBEkuEJ19FQ-0y-KiJeINcUZ7BTv6TuXOE",
-  authDomain: "game-3dc74.firebaseapp.com",
-  projectId: "game-3dc74",
-  storageBucket: "game-3dc74.firebasestorage.app",
-  messagingSenderId: "239384658458",
-  appId: "1:239384658458:web:3986833e5d61fc932a87a3",
-  measurementId: "G-Q0J38297L3"
+    apiKey: "AIzaSyBEkuEJ19FQ-0y-KiJeInCUZ7BTv6TuXOE",
+    authDomain: "game-3dc74.firebaseapp.com",
+     databaseURL: "https://game-3dc74-default-rtdb.asia-southeast1.firebasedatabase.app", 
+    projectId: "game-3dc74",
+    storageBucket: "game-3dc74.firebasestorage.app",
+    messagingSenderId: "239384658458",
+    appId: "1:239384658458:web:3986833e5d61fc932a87a3",
+    measurementId: "G-Q0J38297L3"
 };
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);

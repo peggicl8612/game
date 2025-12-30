@@ -25,21 +25,22 @@
         import { getDatabase, ref, set, update, onValue } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-database.js";
 
         const firebaseConfig = {
-            apiKey: "AIzaSyBEkuEJ19FQ-0y-KiJeINcUZ7BTv6TuXOE",
-            authDomain: "game-3dc74.firebaseapp.com",
-            projectId: "game-3dc74",
-            storageBucket: "game-3dc74.firebasestorage.app",
-            messagingSenderId: "239384658458",
-            appId: "1:239384658458:web:3986833e5d61fc932a87a3",
-            measurementId: "G-Q0J38297L3"
-        };
+    apiKey: "AIzaSyBEkuEJ19FQ-0y-KiJeInCUZ7BTv6TuXOE",
+    authDomain: "game-3dc74.firebaseapp.com",
+     databaseURL: "https://game-3dc74-default-rtdb.asia-southeast1.firebasedatabase.app", 
+    projectId: "game-3dc74",
+    storageBucket: "game-3dc74.firebasestorage.app",
+    messagingSenderId: "239384658458",
+    appId: "1:239384658458:web:3986833e5d61fc932a87a3",
+    measurementId: "G-Q0J38297L3"
+};
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
 
         window.sendQ = () => {
             const img = document.getElementById('img-url').value;
             const ans = document.getElementById('ans').value.split(',');
-            set(ref(db, 'gameState'), {
+            set(ref(db, 'game'), {
                 status: "playing",
                 imgUrl: img,
                 answers: ans,
@@ -49,7 +50,7 @@
 
         window.endRound = () => {
             // 抓取 gameState 的答案進行比分
-            onValue(ref(db, 'gameState'), (snap) => {
+            onValue(ref(db, 'game'), (snap) => {
                 const state = snap.val();
                 const correctOnes = state.answers;
                 onValue(ref(db, 'users'), (uSnap) => {

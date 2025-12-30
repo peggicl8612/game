@@ -8,45 +8,45 @@
         body { background: var(--b); font-family: "Microsoft JhengHei", sans-serif; text-align: center; padding: 20px; color: var(--t); }
         .admin-box { background: white; border: 4px solid var(--t); border-radius: 20px; padding: 20px; max-width: 600px; margin: auto; box-shadow: 8px 8px 0 var(--p); }
         .setup-header { display: flex; justify-content: space-between; align-items: center; background: var(--y); padding: 10px 15px; border-radius: 15px; border: 2px solid var(--t); margin-bottom: 20px; }
-        .player-count { font-size: 1.1rem; color: #FF8E9E; font-weight: bold; }
-        #questions-list { max-height: 350px; overflow-y: auto; margin-bottom: 20px; text-align: left; }
-        .q-item { background: #fff; border: 2px dashed var(--p); padding: 15px; margin-bottom: 10px; border-radius: 12px; }
-        input { width: 90%; padding: 10px; margin: 5px 0; border: 2px solid var(--t); border-radius: 8px; }
+        #questions-list { max-height: 400px; overflow-y: auto; margin-bottom: 20px; text-align: left; }
+        .q-item { background: #fff; border: 2px dashed var(--p); padding: 15px; margin-bottom: 15px; border-radius: 12px; position: relative; }
+        .preview-img { width: 100px; height: 100px; object-fit: cover; border: 2px solid var(--t); border-radius: 10px; margin-top: 10px; display: none; }
+        input[type="text"], input[type="file"] { width: 90%; padding: 10px; margin: 5px 0; border: 2px solid var(--t); border-radius: 8px; }
         .btn { padding: 10px 20px; border-radius: 10px; cursor: pointer; font-weight: bold; border: 2px solid var(--t); margin: 5px; }
-        .btn-reset { background: #FFAB91; color: white; }
+        .btn-reset { background: #FFAB91; }
         .btn-add { background: #B2DFDB; }
-        .btn-start { background: var(--p); font-size: 1.2rem; width: 100%; margin-top: 10px; box-shadow: 0 4px 0 #e8a7b6; }
-        .status-msg { margin-top: 10px; font-weight: bold; color: #5A5A5A; min-height: 24px; }
+        .btn-start { background: var(--p); font-size: 1.2rem; width: 100%; margin-top: 10px; }
+        .status-msg { margin: 10px 0; font-weight: bold; color: #FF8E9E; }
     </style>
 </head>
 <body>
 
     <div class="admin-box">
-        <h2>👑 主持人控制面版</h2>
+        <h2>主持人控制面版</h2>
         
         <div class="setup-header">
-            <div class="player-count">🎮 已加入人數：<span id="p-count">0</span></div>
+            <div>🎮 已加入：<span id="p-count">0</span> 人</div>
             <button class="btn btn-reset" onclick="resetGame()">🧹 清空重設</button>
         </div>
 
         <div id="questions-list">
-            <div class="q-item">
+            <div class="q-item" id="q-1">
                 <strong>第 1 題</strong>
-                <input type="text" class="q-img" placeholder="圖片連結 (URL)">
-                <input type="text" class="q-ans" placeholder="正確答案 (多個用逗號隔開)">
+                <input type="file" class="q-file" accept="image/*" onchange="previewImage(this)">
+                <img class="preview-img">
+                <input type="text" class="q-ans" placeholder="輸入正確答案">
             </div>
         </div>
 
-        <button class="btn btn-add" onclick="addQuestion()">➕ 新增一題</button>
-        <div id="current-status" class="status-msg">等待設定中...</div>
-        <button class="btn btn-start" onclick="startAutoGame()">🚀 開始同步遊戲</button>
+        <button class="btn btn-add" onclick="addQuestion()">➕ 新增題目</button>
+        <div id="current-status" class="status-msg">等待開始...</div>
+        <button class="btn btn-start" onclick="startAutoGame()">開始遊戲</button>
     </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-app.js";
         import { getDatabase, ref, set, update, onValue, remove } from "https://www.gstatic.com/firebasejs/9.15.0/firebase-database.js";
 
-        // Firebase 設定 (請確保與玩家端一致)
         const firebaseConfig = {
             apiKey: "AIzaSyBEkuEJ19FQ-0y-KiJeInCUZ7BTv6TuXOE",
             authDomain: "game-3dc74.firebaseapp.com",
@@ -60,18 +60,22 @@
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
 
-        // 監聽人數
+        // 人數監聽
         onValue(ref(db, 'users'), (snap) => {
-            const count = snap.exists() ? Object.keys(snap.val()).length : 0;
-            document.getElementById('p-count').innerText = count;
+            document.getElementById('p-count').innerText = snap.exists() ? Object.keys(snap.val()).length : 0;
         });
 
-        // 🧹 徹底重設功能：這是讓玩家端「不留白」的關鍵
-        window.resetGame = async () => {
-            if(confirm("確定要清空資料庫嗎？玩家端將回到初始等待狀態。")) {
-                await set(ref(db, '/'), { users: null, gameState: null, gameData: null });
-                alert("資料庫已歸零！");
-                location.reload();
+        // 圖片預覽與轉換 Base64
+        window.previewImage = (input) => {
+            const file = input.files[0];
+            const preview = input.parentElement.querySelector('.preview-img');
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    preview.src = e.target.result;
+                    preview.style.display = 'block';
+                };
+                reader.readAsDataURL(file);
             }
         };
 
@@ -80,121 +84,98 @@
             const num = document.querySelectorAll('.q-item').length + 1;
             const div = document.createElement('div');
             div.className = 'q-item';
-            div.innerHTML = `<strong>第 ${num} 題</strong><input type="text" class="q-img" placeholder="圖片連結"><input type="text" class="q-ans" placeholder="正確答案">`;
+            div.innerHTML = `
+                <strong>第 ${num} 題</strong>
+                <input type="file" class="q-file" accept="image/*" onchange="previewImage(this)">
+                <img class="preview-img">
+                <input type="text" class="q-ans" placeholder="正確答案">
+            `;
             list.appendChild(div);
-            list.scrollTop = list.scrollHeight;
         };
 
-        // 🚀 啟動流程
+        window.resetGame = async () => {
+            if(confirm("確定重設？")) {
+                await set(ref(db, '/'), { users: null, gameState: null, gameData: null });
+                location.reload();
+            }
+        };
+
         window.startAutoGame = async () => {
-            const imgs = document.querySelectorAll('.q-img');
-            const ans = document.querySelectorAll('.q-ans');
+            const items = document.querySelectorAll('.q-item');
             const questions = [];
 
-            imgs.forEach((el, i) => {
-                if(el.value.trim() && ans[i].value.trim()) {
+            for (let item of items) {
+                const imgData = item.querySelector('.preview-img').src;
+                const ansText = item.querySelector('.q-ans').value.trim();
+                if (imgData && ansText) {
                     questions.push({
-                        img: el.value.trim(),
-                        ans: ans[i].value.split(',').map(s => s.trim())
+                        img: imgData, // 這裡是 base64 字串
+                        ans: ansText.split(',').map(s => s.trim())
                     });
                 }
-            });
+            }
 
-            if(questions.length === 0) return alert("請先輸入題目內容！");
+            if(questions.length === 0) return alert("請先上傳圖片並輸入答案！");
 
             const statusMsg = document.getElementById('current-status');
-            
-            // 1. 先把 gameState 設為 null，強制讓玩家端進入等待邏輯
             await remove(ref(db, 'gameState'));
-            
-            // 2. 存入題庫並重置分數
             await set(ref(db, 'gameData/questions'), questions);
+
+            // 重置分數
             onValue(ref(db, 'users'), (snap) => {
                 const users = snap.val();
                 if(users) {
-                    for(let name in users) {
-                        update(ref(db, `users/${name}`), { score: 0, lastAns: "", lastTime: 0 });
-                    }
+                    for(let name in users) update(ref(db, `users/${name}`), { score: 0, lastAns: "", lastTime: 0 });
                 }
             }, {onlyOnce: true});
 
-            // 3. 開始定時循環
             let idx = 0;
             const run = () => {
                 if(idx < questions.length) {
-                    statusMsg.innerText = `📢 播送中：第 ${idx+1} 題`;
-                    set(ref(db, 'gameState'), {
-                        status: "playing",
-                        index: idx,
-                        startTime: Date.now()
-                    });
+                    statusMsg.innerText = `📢 第 ${idx+1} 題播送中...`;
+                    set(ref(db, 'gameState'), { status: "playing", index: idx, startTime: Date.now() });
 
-                    // 15秒答題
                     setTimeout(() => {
                         calculatePoints(questions[idx].ans);
                         set(ref(db, 'gameState/status'), "round_rank");
-                        statusMsg.innerText = `顯示第 ${idx+1} 題排名...`;
-                        
                         idx++;
-                        // 5秒排名緩衝後進入下一題
                         setTimeout(run, 5000);
                     }, 15000);
                 } else {
-                    statusMsg.innerText = "🏆 遊戲結束！頒獎中";
                     set(ref(db, 'gameState/status'), "final_ceremony");
                 }
             };
             run();
         };
 
-       function calculatePoints(correctArray) {
-    onValue(ref(db, 'users'), (snap) => {
-        const users = snap.val();
-        if (!users) return;
+        function calculatePoints(correctArray) {
+            onValue(ref(db, 'users'), (snap) => {
+                const users = snap.val();
+                if(!users) return;
+                for(let name in users) {
+                    const u = users[name];
+                    if(u.lastAns && correctArray.includes(u.lastAns.trim())) {
+                        const remain = 15 - Math.floor((u.lastTime || 0)/1000);
+                        let added = 0;
+                        if (remain >= 14) added = 999;
+                        else if (remain >= 12) added = 927;
+                        else if (remain >= 10) added = 889;
+                        else if (remain >= 8) added = 831;
+                        else if (remain >= 6) added = 769;
+                        else if (remain >= 4) added = 684;
+                        else if (remain >= 2) added = 599;
+                        else added = 502;
 
-        for (let name in users) {
-            const u = users[name];
-            
-            // 檢查玩家是否有答案且在正確答案清單中
-            if (u.lastAns && correctArray.includes(u.lastAns.trim())) {
-                
-                // 計算剩餘秒數 (15 - 已用秒數)
-                const usedSeconds = Math.floor((u.lastTime || 0) / 1000);
-                const remain = 15 - usedSeconds;
-                
-                let addedScore = 0;
-
-                // 根據你提供的新分數規則進行判斷
-                if (remain >= 14) {
-                    addedScore = 999;
-                } else if (remain >= 12) {
-                    addedScore = 927;
-                } else if (remain >= 10) {
-                    addedScore = 889;
-                } else if (remain >= 8) {
-                    addedScore = 831;
-                } else if (remain >= 6) {
-                    addedScore = 769;
-                } else if (remain >= 4) {
-                    addedScore = 684;
-                } else if (remain >= 2) {
-                    addedScore = 599;
-                } else {
-                    addedScore = 502; // 0-1秒
+                        update(ref(db, `users/${name}`), { 
+                            score: (u.score || 0) + added,
+                            lastAns: ""
+                        });
+                    } else {
+                        update(ref(db, `users/${name}`), { lastAns: "" });
+                    }
                 }
-
-                // 更新資料庫中的分數
-                update(ref(db, `users/${name}`), { 
-                    score: (u.score || 0) + addedScore,
-                    lastAns: "" // 清空答案以便下一題
-                });
-            } else {
-                // 沒答對或沒作答，僅清空最後答案
-                update(ref(db, `users/${name}`), { lastAns: "" });
-            }
+            }, {onlyOnce: true});
         }
-    }, { onlyOnce: true });
-}
     </script>
 </body>
 </html>

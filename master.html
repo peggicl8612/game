@@ -2,7 +2,7 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <title>吉伊卡哇控場大師 👑</title>
+    <title>猜猜我是誰-後台控制面板 </title>
     <style>
         :root { --p: #FFD1DC; --b: #E0F7FA; --y: #FFF9E5; --t: #5A5A5A; }
         body { background: var(--b); font-family: "Microsoft JhengHei", sans-serif; text-align: center; padding: 20px; color: var(--t); }
@@ -10,6 +10,9 @@
         .setup-header { display: flex; justify-content: space-between; align-items: center; background: var(--y); padding: 10px 15px; border-radius: 15px; border: 2px solid var(--t); margin-bottom: 20px; }
         #questions-list { max-height: 400px; overflow-y: auto; margin-bottom: 20px; text-align: left; }
         .q-item { background: #fff; border: 2px dashed var(--p); padding: 15px; margin-bottom: 15px; border-radius: 12px; position: relative; }
+        .q-item-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+        .btn-delete { background: #FF6B6B; color: white; border: 2px solid var(--t); padding: 5px 15px; border-radius: 8px; cursor: pointer; font-size: 0.85rem; font-weight: bold; }
+        .btn-delete:hover { background: #FF5252; }
         .preview-img { width: 100px; height: 100px; object-fit: cover; border: 2px solid var(--t); border-radius: 10px; margin-top: 10px; display: none; }
         input[type="text"], input[type="file"] { width: 90%; padding: 10px; margin: 5px 0; border: 2px solid var(--t); border-radius: 8px; }
         .btn { padding: 10px 20px; border-radius: 10px; cursor: pointer; font-weight: bold; border: 2px solid var(--t); margin: 5px; }
@@ -17,21 +20,167 @@
         .btn-add { background: #B2DFDB; }
         .btn-start { background: var(--p); font-size: 1.2rem; width: 100%; margin-top: 10px; }
         .status-msg { margin: 10px 0; font-weight: bold; color: #FF8E9E; }
+
+        /* Snackbar 通知條 */
+        .snackbar {
+            visibility: hidden;
+            min-width: 250px;
+            background-color: #333;
+            color: #fff;
+            text-align: center;
+            border-radius: 15px;
+            padding: 16px 20px;
+            position: fixed;
+            z-index: 9999;
+            top: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 1rem;
+            font-weight: bold;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            border: 3px solid var(--t);
+        }
+        .snackbar.show {
+            visibility: visible;
+            animation: fadein 0.3s, fadeout 0.3s 2.7s;
+        }
+        .snackbar.error {
+            background: linear-gradient(135deg, #FF6B6B, #FF8E9E);
+        }
+        .snackbar.success {
+            background: linear-gradient(135deg, #4CAF50, #81C784);
+        }
+        .snackbar.info {
+            background: linear-gradient(135deg, #2196F3, #64B5F6);
+        }
+        @keyframes fadein {
+            from { top: 0; opacity: 0; }
+            to { top: 30px; opacity: 1; }
+        }
+        @keyframes fadeout {
+            from { top: 30px; opacity: 1; }
+            to { top: 0; opacity: 0; }
+        }
+
+        /* 自訂確認對話框 */
+        .confirm-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 10000;
+            justify-content: center;
+            align-items: center;
+        }
+        .confirm-overlay.show {
+            display: flex;
+            animation: overlayFadeIn 0.3s;
+        }
+        .confirm-box {
+            background: white;
+            border: 4px solid var(--t);
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 400px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.3);
+            animation: boxSlideIn 0.3s;
+        }
+        .confirm-box h3 {
+            margin: 0 0 20px 0;
+            color: var(--t);
+            font-size: 1.3rem;
+        }
+        .confirm-box p {
+            margin: 0 0 25px 0;
+            color: #666;
+            font-size: 1rem;
+            line-height: 1.5;
+        }
+        .confirm-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content:center;
+            align-items: center;
+        }
+        .confirm-btn {
+            padding: 10px 25px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-weight: bold;
+            border: 2px solid var(--t);
+            font-size: 1rem;
+            transition: transform 0.1s;
+        }
+        .confirm-btn:active {
+            transform: translateY(2px);
+        }
+        .confirm-btn-cancel {
+            background: #E0E0E0;
+            color: var(--t);
+        }
+        .confirm-btn-cancel:hover {
+            background: #D0D0D0;
+        }
+        .confirm-btn-ok {
+            background: var(--p);
+            color: var(--t);
+        }
+        .confirm-btn-ok:hover {
+            background: #FFB8C8;
+        }
+        @keyframes overlayFadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        @keyframes boxSlideIn {
+            from { transform: translateY(-50px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
     </style>
 </head>
 <body>
+    <!-- Snackbar 通知條 -->
+    <div id="snackbar" class="snackbar"></div>
 
-    <div class="admin-box">
+    <!-- 自訂確認對話框 -->
+    <div id="confirm-overlay" class="confirm-overlay">
+        <div class="confirm-box">
+            <h3>確認操作</h3>
+            <p id="confirm-message"></p>
+            <div class="confirm-buttons">
+                <button class="confirm-btn confirm-btn-cancel" onclick="hideConfirm(false)">取消</button>
+                <button class="confirm-btn confirm-btn-ok" onclick="hideConfirm(true)">確定</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 房間登入畫面 -->
+    <div class="admin-box" id="room-login-zone">
         <h2>主持人控制面版</h2>
+        <p style="color: #888; margin: 20px 0;">請設定您的房間號碼</p>
+        <input type="text" id="master-room-id" placeholder="輸入房間號碼（例如：8888）" style="width: 85%; text-align: center;">
+        <button class="btn btn-start" onclick="enterMasterRoom()" style="width: 90%; margin-top: 15px;">進入控制台</button>
+    </div>
+
+    <!-- 主控制面板 -->
+    <div class="admin-box" id="main-control-zone" style="display:none;">
+        <h2>主持人控制面版</h2>
+        <p style="font-size: 0.9rem; color: #FF8E9E; margin: -10px 0 15px;">房間號碼：<strong id="display-room-id"></strong></p>
         
         <div class="setup-header">
             <div>🎮 已加入：<span id="p-count">0</span> 人</div>
-            <button class="btn btn-reset" onclick="resetGame()">🧹 清空重設</button>
+            <button class="btn btn-reset" onclick="resetGame()">清空重設</button>
         </div>
 
         <div id="questions-list">
-            <div class="q-item" id="q-1">
-                <strong>第 1 題</strong>
+            <div class="q-item">
+                <div class="q-item-header">
+                    <strong>第 1 題</strong>
+                    <button class="btn-delete" onclick="deleteQuestion(this)">X刪除</button>
+                </div>
                 <input type="file" class="q-file" accept="image/*" onchange="previewImage(this)">
                 <img class="preview-img">
                 <input type="text" class="q-ans" placeholder="輸入正確答案">
@@ -59,11 +208,52 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
+        let roomId = "";
 
-        // 人數監聽
-        onValue(ref(db, 'users'), (snap) => {
-            document.getElementById('p-count').innerText = snap.exists() ? Object.keys(snap.val()).length : 0;
-        });
+        // Snackbar 通知函數
+        function showSnackbar(message, type = 'info') {
+            const snackbar = document.getElementById('snackbar');
+            snackbar.textContent = message;
+            snackbar.className = 'snackbar show ' + type;
+            setTimeout(() => {
+                snackbar.className = snackbar.className.replace('show', '');
+            }, 3000);
+        }
+
+        // 自訂確認對話框
+        let confirmCallback = null;
+        function showConfirm(message) {
+            return new Promise((resolve) => {
+                document.getElementById('confirm-message').textContent = message;
+                document.getElementById('confirm-overlay').classList.add('show');
+                confirmCallback = resolve;
+            });
+        }
+        window.hideConfirm = (result) => {
+            document.getElementById('confirm-overlay').classList.remove('show');
+            if (confirmCallback) {
+                confirmCallback(result);
+                confirmCallback = null;
+            }
+        };
+
+        // 主持人進入房間
+        window.enterMasterRoom = () => {
+            roomId = document.getElementById('master-room-id').value.trim();
+            if(!roomId) return showSnackbar("請輸入房間號碼！", "error");
+            
+            // 顯示房間號碼
+            document.getElementById('display-room-id').innerText = roomId;
+            
+            // 切換畫面
+            document.getElementById('room-login-zone').style.display = 'none';
+            document.getElementById('main-control-zone').style.display = 'block';
+            
+            // 開始監聽人數
+            onValue(ref(db, `rooms/${roomId}/users`), (snap) => {
+                document.getElementById('p-count').innerText = snap.exists() ? Object.keys(snap.val()).length : 0;
+            });
+        };
 
         // 圖片預覽與轉換 Base64
         window.previewImage = (input) => {
@@ -85,7 +275,10 @@
             const div = document.createElement('div');
             div.className = 'q-item';
             div.innerHTML = `
-                <strong>第 ${num} 題</strong>
+                <div class="q-item-header">
+                    <strong>第 ${num} 題</strong>
+                    <button class="btn-delete" onclick="deleteQuestion(this)">X刪除</button>
+                </div>
                 <input type="file" class="q-file" accept="image/*" onchange="previewImage(this)">
                 <img class="preview-img">
                 <input type="text" class="q-ans" placeholder="正確答案">
@@ -93,10 +286,53 @@
             list.appendChild(div);
         };
 
+        // 刪除題目
+        window.deleteQuestion = async (btn) => {
+            const qItem = btn.closest('.q-item');
+            const allItems = document.querySelectorAll('.q-item');
+            
+            // 如果只剩一題，不允許刪除
+            if (allItems.length <= 1) {
+                showSnackbar('至少需要保留一題！', 'error');
+                return;
+            }
+            
+            const confirmed = await showConfirm('確定要刪除這一題？');
+            if (confirmed) {
+                qItem.remove();
+                
+                // 重新編號
+                document.querySelectorAll('.q-item').forEach((item, index) => {
+                    item.querySelector('strong').innerText = `第 ${index + 1} 題`;
+                });
+                showSnackbar('題目已刪除', 'success');
+            }
+        };
+
         window.resetGame = async () => {
-            if(confirm("確定重設？")) {
-                await set(ref(db, '/'), { users: null, gameState: null, gameData: null });
-                location.reload();
+            const confirmed = await showConfirm("確定重設此房間的題庫和遊戲資料？");
+            if(confirmed) {
+                // 清空 Firebase 資料
+                await set(ref(db, `rooms/${roomId}`), { users: null, gameState: null, gameData: null });
+                
+                // 清空題目列表，保留第一題
+                const questionsList = document.getElementById('questions-list');
+                questionsList.innerHTML = `
+                    <div class="q-item">
+                        <div class="q-item-header">
+                            <strong>第 1 題</strong>
+                            <button class="btn-delete" onclick="deleteQuestion(this)">🗑️ 刪除</button>
+                        </div>
+                        <input type="file" class="q-file" accept="image/*" onchange="previewImage(this)">
+                        <img class="preview-img">
+                        <input type="text" class="q-ans" placeholder="輸入正確答案">
+                    </div>
+                `;
+                
+                // 重置狀態訊息
+                document.getElementById('current-status').innerText = '等待開始...';
+                
+                showSnackbar('題庫已清空！可以重新上傳題目。', 'success');
             }
         };
 
@@ -115,17 +351,17 @@
                 }
             }
 
-            if(questions.length === 0) return alert("請先上傳圖片並輸入答案！");
+            if(questions.length === 0) return showSnackbar("請先上傳圖片並輸入答案！", "error");
 
             const statusMsg = document.getElementById('current-status');
-            await remove(ref(db, 'gameState'));
-            await set(ref(db, 'gameData/questions'), questions);
+            await remove(ref(db, `rooms/${roomId}/gameState`));
+            await set(ref(db, `rooms/${roomId}/gameData/questions`), questions);
 
             // 重置分數
-            onValue(ref(db, 'users'), (snap) => {
+            onValue(ref(db, `rooms/${roomId}/users`), (snap) => {
                 const users = snap.val();
                 if(users) {
-                    for(let name in users) update(ref(db, `users/${name}`), { score: 0, lastAns: "", lastTime: 0 });
+                    for(let name in users) update(ref(db, `rooms/${roomId}/users/${name}`), { score: 0, lastAns: "", lastTime: 0 });
                 }
             }, {onlyOnce: true});
 
@@ -133,23 +369,23 @@
             const run = () => {
                 if(idx < questions.length) {
                     statusMsg.innerText = `📢 第 ${idx+1} 題播送中...`;
-                    set(ref(db, 'gameState'), { status: "playing", index: idx, startTime: Date.now() });
+                    set(ref(db, `rooms/${roomId}/gameState`), { status: "playing", index: idx, startTime: Date.now() });
 
                     setTimeout(() => {
                         calculatePoints(questions[idx].ans);
-                        set(ref(db, 'gameState/status'), "round_rank");
+                        set(ref(db, `rooms/${roomId}/gameState/status`), "round_rank");
                         idx++;
                         setTimeout(run, 5000);
                     }, 15000);
                 } else {
-                    set(ref(db, 'gameState/status'), "final_ceremony");
+                    set(ref(db, `rooms/${roomId}/gameState/status`), "final_ceremony");
                 }
             };
             run();
         };
 
         function calculatePoints(correctArray) {
-            onValue(ref(db, 'users'), (snap) => {
+            onValue(ref(db, `rooms/${roomId}/users`), (snap) => {
                 const users = snap.val();
                 if(!users) return;
                 for(let name in users) {
@@ -166,12 +402,12 @@
                         else if (remain >= 2) added = 599;
                         else added = 502;
 
-                        update(ref(db, `users/${name}`), { 
+                        update(ref(db, `rooms/${roomId}/users/${name}`), { 
                             score: (u.score || 0) + added,
                             lastAns: ""
                         });
                     } else {
-                        update(ref(db, `users/${name}`), { lastAns: "" });
+                        update(ref(db, `rooms/${roomId}/users/${name}`), { lastAns: "" });
                     }
                 }
             }, {onlyOnce: true});

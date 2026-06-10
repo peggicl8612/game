@@ -36,14 +36,59 @@
             font-size: 1.1rem;
             color: #5A5A5A;
         }
+
+        /* Snackbar 通知條 */
+        .snackbar {
+            visibility: hidden;
+            min-width: 250px;
+            background-color: #333;
+            color: #fff;
+            text-align: center;
+            border-radius: 15px;
+            padding: 16px 20px;
+            position: fixed;
+            z-index: 9999;
+            top: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 1rem;
+            font-weight: bold;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            border: 3px solid var(--t);
+        }
+        .snackbar.show {
+            visibility: visible;
+            animation: fadein 0.3s, fadeout 0.3s 2.7s;
+        }
+        .snackbar.error {
+            background: linear-gradient(135deg, #FF6B6B, #FF8E9E);
+        }
+        .snackbar.success {
+            background: linear-gradient(135deg, #4CAF50, #81C784);
+        }
+        .snackbar.info {
+            background: linear-gradient(135deg, #2196F3, #64B5F6);
+        }
+        @keyframes fadein {
+            from { top: 0; opacity: 0; }
+            to { top: 30px; opacity: 1; }
+        }
+        @keyframes fadeout {
+            from { top: 30px; opacity: 1; }
+            to { top: 0; opacity: 0; }
+        }
     </style>
 </head>
 <body>
+    <!-- Snackbar 通知條 -->
+    <div id="snackbar" class="snackbar"></div>
+    
     <div class="card">
         <div id="login-zone">
             <h2>猜猜我是誰</h2>
             <div id="qrcode" style="margin-bottom: 15px;"></div>
             <p style="font-size: 0.9rem; color: #888;">掃描上方 QR Code 加入遊戲</p>
+            <input type="text" id="room-id" placeholder="輸入房間號碼（例如：8888）">
             <input type="text" id="nickname" placeholder="輸入你的暱稱...">
             <button class="btn" id="join-btn">加入並等待開始</button>
         </div>
@@ -62,11 +107,20 @@
                 <input type="text" id="ans-input" placeholder="答案是？">
                 <button class="btn" id="submit-btn">送出答案</button>
             </div>
-            <p id="wait-msg" style="display:none;">已送出，等待下一題... 🍵</p>
+            <p id="wait-msg" style="display:none;">已送出，等待下一題... </p>
         </div>
 
         <div id="rank-zone" style="display:none;">
             <h3>✨ 目前積分排名</h3>
+            <div style="background: var(--y); padding: 15px; border-radius: 15px; margin-bottom: 15px; border: 2px solid var(--t);">
+                <p style="margin: 5px 0; font-weight: bold;">正確答案：<span id="correct-answer" style="color: #FF8E9E; font-size: 1.2rem;"></span></p>
+                <div style="margin-top: 10px;">
+                    <div style="background: #ddd; height: 20px; border-radius: 10px; overflow: hidden; border: 2px solid var(--t);">
+                        <div id="countdown-bar" style="background: linear-gradient(90deg, #FF8E9E, #FFD1DC); height: 100%; width: 100%; transition: width 0.1s linear;"></div>
+                    </div>
+                    <p style="margin: 5px 0; font-size: 0.9rem; color: #888;"><span id="countdown-text">5</span> 秒後進入下一題</p>
+                </div>
+            </div>
             <div id="rank-list"></div>
         </div>
 
@@ -106,14 +160,28 @@
         };
 
         let myName = "";
+        let roomId = "";
         let questions = [];
 
+        // Snackbar 通知函數
+        function showSnackbar(message, type = 'info') {
+            const snackbar = document.getElementById('snackbar');
+            snackbar.textContent = message;
+            snackbar.className = 'snackbar show ' + type;
+            setTimeout(() => {
+                snackbar.className = snackbar.className.replace('show', '');
+            }, 3000);
+        }
+
         document.getElementById('join-btn').onclick = () => {
-            myName = document.getElementById('nickname').value;
-            if(!myName) return alert("請輸入暱稱！");
+            roomId = document.getElementById('room-id').value.trim();
+            myName = document.getElementById('nickname').value.trim();
             
-            // 寫入玩家到資料庫
-            set(ref(db, `users/${myName}`), { score: 0, lastAns: "", lastTime: 0 });
+            if(!roomId) return showSnackbar("請輸入房間號碼！", "error");
+            if(!myName) return showSnackbar("請輸入暱稱！", "error");
+            
+            // 寫入玩家到資料庫（使用房間號碼）
+            set(ref(db, `rooms/${roomId}/users/${myName}`), { score: 0, lastAns: "", lastTime: 0 });
             
             // 隱藏登入區，顯示等待區
             document.getElementById('login-zone').style.display = 'none';
@@ -124,8 +192,8 @@
 
         document.getElementById('submit-btn').onclick = () => {
             const ans = document.getElementById('ans-input').value;
-            onValue(ref(db, 'gameState/startTime'), (snap) => {
-                update(ref(db, `users/${myName}`), { 
+            onValue(ref(db, `rooms/${roomId}/gameState/startTime`), (snap) => {
+                update(ref(db, `rooms/${roomId}/users/${myName}`), { 
                     lastAns: ans, 
                     lastTime: Date.now() - snap.val() 
                 });
@@ -135,9 +203,9 @@
         };
 
         function listenToGame() {
-            onValue(ref(db, 'gameData/questions'), snap => { questions = snap.val(); });
+            onValue(ref(db, `rooms/${roomId}/gameData/questions`), snap => { questions = snap.val(); });
 
-            onValue(ref(db, 'gameState'), snap => {
+            onValue(ref(db, `rooms/${roomId}/gameState`), snap => {
                 const state = snap.val();
                 
                 // 【核心修正】如果沒有狀態，就強制停留在等待畫面
@@ -153,7 +221,7 @@
                 if(state.status === "playing") {
                     showQuestion(state);
                 } else if(state.status === "round_rank") {
-                    showRanking("rank-zone", "rank-list");
+                    showRanking("rank-zone", "rank-list", state.index);
                 } else if(state.status === "final_ceremony") {
                     showFinalCeremony(); 
                 }
@@ -193,10 +261,33 @@
             }, 1000);
         }
 
-        function showRanking(zoneId, listId) {
+        function showRanking(zoneId, listId, questionIndex) {
             hideAllGameZones();
             document.getElementById(zoneId).style.display = 'block';
-            onValue(ref(db, 'users'), snap => {
+            
+            // 顯示正確答案
+            if (questions && questions[questionIndex]) {
+                const correctAnswers = questions[questionIndex].ans;
+                document.getElementById('correct-answer').innerText = correctAnswers.join(' / ');
+            }
+            
+            // 5秒倒數進度條
+            let countdown = 5;
+            const countdownBar = document.getElementById('countdown-bar');
+            const countdownText = document.getElementById('countdown-text');
+            
+            const countdownInterval = setInterval(() => {
+                countdown--;
+                countdownText.innerText = countdown;
+                countdownBar.style.width = (countdown / 5 * 100) + '%';
+                
+                if (countdown <= 0) {
+                    clearInterval(countdownInterval);
+                }
+            }, 1000);
+            
+            // 顯示排名
+            onValue(ref(db, `rooms/${roomId}/users`), snap => {
                 const data = snap.val();
                 if(!data) return;
                 const users = Object.entries(data).sort((a,b) => b[1].score - a[1].score);
@@ -214,7 +305,7 @@
             
             confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
 
-            onValue(ref(db, 'users'), snap => {
+            onValue(ref(db, `rooms/${roomId}/users`), snap => {
                 const data = snap.val();
                 if(!data) return;
                 const users = Object.entries(data).sort((a,b) => b[1].score - a[1].score);
